@@ -1,7 +1,7 @@
 package com.example.voicecall
 
 import android.media.AudioFormat
-import org.webrtc.audio.JavaAudioDeviceModule
+import org.webrtc.audio.AudioRecordDataCallback
 import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.floor
@@ -52,7 +52,7 @@ object VoiceFx {
     }
 
     // WebRTC вызывает это на каждые 10 мс звука с микрофона, буфер меняем на месте
-    val callback = JavaAudioDeviceModule.AudioRecordDataCallback { audioFormat, channelCount, sampleRate, audioBuffer ->
+    val callback = AudioRecordDataCallback { audioFormat, channelCount, sampleRate, audioBuffer ->
         val r = ratio
         if (r != 1f && audioFormat == AudioFormat.ENCODING_PCM_16BIT && channelCount == 1) {
             if (sampleRate != rate) reset(sampleRate)
