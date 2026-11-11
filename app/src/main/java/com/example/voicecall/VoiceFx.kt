@@ -56,25 +56,27 @@ object VoiceFx {
     }
 
     val callback = AudioRecordDataCallback { audioFormat, channelCount, sampleRate, audioBuffer ->
-        val r = ratio
-        if (sampleRate != rate && sampleRate > 0 && sampleRate <= 96000) reset(sampleRate)
-        var done = false
-        if (r != 1f && channelCount == 1) {
-            val b = audioBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
-            val n = b.capacity() / 2
-            for (i in 0 until n) {
-                val idx = i * 2
-                val x = b.getShort(idx) / 32768f
-                val y = shift(x, r)
-                b.putShort(idx, (y * 32767f).toInt().coerceIn(-32768, 32767).toShort())
-            }
-            done = true
-        }
         calls++
-        if (calls % 50 == 1) {
-            info = "fx: вызовов=$calls fmt=$audioFormat ch=$channelCount sr=$sampleRate " +
-                "cap=${audioBuffer.capacity()} pos=${audioBuffer.position()} lim=${audioBuffer.limit()} " +
-                "ratio=$r меняю=$done"
+        val r = ratio
+        val head = "fx: вызовов=$calls fmt=$audioFormat ch=$channelCount sr=$sampleRate " +
+            "cap=${audioBuffer.capacity()} pos=${audioBuffer.position()} lim=${audioBuffer.limit()} " +
+            "direct=${audioBuffer.isDirect} ro=${audioBuffer.isReadOnly} ratio=$r"
+        if (calls == 1 || calls % 100 == 0) info = head
+        try {
+            if (sampleRate != rate && sampleRate > 0 && sampleRate <= 96000) reset(sampleRate)
+            if (r != 1f && channelCount == 1 && !audioBuffer.isReadOnly) {
+                val b = audioBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+                val n = b.capacity() / 2
+                for (i in 0 until n) {
+                    val idx = i * 2
+                    val x = b.getShort(idx) / 32768f
+                    val y = shift(x, r)
+                    b.putShort(idx, (y * 32767f).toInt().coerceIn(-32768, 32767).toShort())
+                }
+                if (calls % 100 == 0) info = "$head МЕНЯЮ"
+            }
+        } catch (e: Throwable) {
+            info = "ОШИБКА: ${e.javaClass.simpleName} ${e.message}"
         }
     }
 }
