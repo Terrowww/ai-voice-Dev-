@@ -1,6 +1,8 @@
 package com.example.voicecall
 
-import android.media.AudioFormat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import org.webrtc.audio.AudioRecordDataCallback
 import java.nio.ByteOrder
 import kotlin.math.PI
@@ -10,12 +12,14 @@ import kotlin.math.sin
 /** Смена тона для голоса, который уходит в звонок. ratio = 1 значит без изменений. */
 object VoiceFx {
     @Volatile var ratio = 1f
+    var info by mutableStateOf("fx: колбэк ещё не вызывался")
 
     private var rate = 0
     private var win = 1920
     private val ring = FloatArray(8192)
     private var w = 0
     private var d1 = 0f
+    private var calls = 0
 
     private fun reset(sampleRate: Int) {
         rate = sampleRate
@@ -51,20 +55,26 @@ object VoiceFx {
         return y
     }
 
-    // WebRTC вызывает это на каждые 10 мс звука с микрофона, буфер меняем на месте
     val callback = AudioRecordDataCallback { audioFormat, channelCount, sampleRate, audioBuffer ->
         val r = ratio
-        if (r != 1f && audioFormat == AudioFormat.ENCODING_PCM_16BIT && channelCount == 1) {
-            if (sampleRate != rate) reset(sampleRate)
+        if (sampleRate != rate && sampleRate > 0 && sampleRate <= 96000) reset(sampleRate)
+        var done = false
+        if (r != 1f && channelCount == 1) {
             val b = audioBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
-            val start = b.position()
-            val n = (b.limit() - start) / 2
+            val n = b.capacity() / 2
             for (i in 0 until n) {
-                val idx = start + i * 2
+                val idx = i * 2
                 val x = b.getShort(idx) / 32768f
                 val y = shift(x, r)
                 b.putShort(idx, (y * 32767f).toInt().coerceIn(-32768, 32767).toShort())
             }
+            done = true
+        }
+        calls++
+        if (calls % 50 == 1) {
+            info = "fx: вызовов=$calls fmt=$audioFormat ch=$channelCount sr=$sampleRate " +
+                "cap=${audioBuffer.capacity()} pos=${audioBuffer.position()} lim=${audioBuffer.limit()} " +
+                "ratio=$r меняю=$done"
         }
     }
 }

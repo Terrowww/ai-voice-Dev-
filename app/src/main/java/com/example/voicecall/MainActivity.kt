@@ -59,6 +59,7 @@ fun AppRoot() {
     val ctx = LocalContext.current
     val sig = remember { Signaling(ctx) }
     val engine = remember { CallEngine(ctx, sig) }
+    LaunchedEffect(vs.voiceOn, vs.preset) { VoiceFx.ratio = if (vs.voiceOn) vs.preset else 1f }
     var screen by remember { mutableStateOf<Screen>(Screen.Main) }
 
     val permLauncher = rememberLauncherForActivityResult(
@@ -116,6 +117,7 @@ fun AppRoot() {
             )
         }
 
+        if (screen is Screen.Call) { Text(VoiceFx.info, modifier = Modifier.align(Alignment.TopCenter).padding(top = 50.dp), color = Color.Yellow, fontSize = 11.sp) }
         // свой номер виден только в настройках голоса
         if (screen is Screen.Voice) {
             Text(
