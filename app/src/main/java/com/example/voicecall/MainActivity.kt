@@ -50,7 +50,7 @@ class VoiceState {
     var preset by mutableFloatStateOf(0.84f)
     var listening by mutableStateOf(false)
     var latency by mutableIntStateOf(0)
-    fun apply() { engine.ratio = if (voiceOn) preset else 1f }
+    fun apply() { engine.ratio = if (voiceOn) preset else 1f; VoiceFx.ratio = engine.ratio }
 }
 
 @Composable

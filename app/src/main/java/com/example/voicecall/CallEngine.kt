@@ -57,7 +57,7 @@ class CallEngine(ctx: Context, private val sig: Signaling) {
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions()
         )
-        val adm = JavaAudioDeviceModule.builder(app).createAudioDeviceModule()
+        val adm = JavaAudioDeviceModule.builder(app).setAudioRecordDataCallback(VoiceFx.callback).createAudioDeviceModule()
         return PeerConnectionFactory.builder()
             .setAudioDeviceModule(adm)
             .createPeerConnectionFactory()
