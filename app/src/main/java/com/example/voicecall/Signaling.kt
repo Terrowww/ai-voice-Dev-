@@ -11,17 +11,21 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 
-// "Почта" между телефонами: вход в Firebase, свой код, записка о звонке
+// 10 цифр -> "123 456 78 90", чтобы выглядело как номер
+fun fmtNumber(d: String): String =
+    if (d.length == 10) "${d.substring(0, 3)} ${d.substring(3, 6)} ${d.substring(6, 8)} ${d.substring(8)}" else d
+
+// "Почта" между телефонами: вход в Firebase, свой номер, записка о звонке
 class Signaling(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("vc", Context.MODE_PRIVATE)
     private val db = FirebaseDatabase
         .getInstance("https://voicecall-62a00-default-rtdb.europe-west1.firebasedatabase.app")
         .reference
 
-    // свой код: 4 цифры, создаётся один раз и запоминается
-    val myCode: String = prefs.getString("code", null)
-        ?: (1000 + java.util.Random().nextInt(9000)).toString()
-            .also { prefs.edit().putString("code", it).apply() }
+    // свой номер: 10 цифр, создаётся один раз и запоминается (это внутренний номер приложения)
+    val myNumber: String = prefs.getString("num", null)
+        ?: (1000000000L + (java.util.Random().nextDouble() * 8999999999L).toLong()).toString()
+            .also { prefs.edit().putString("num", it).apply() }
 
     var status by mutableStateOf("подключение...")
     var incomingFrom by mutableStateOf<String?>(null)
@@ -30,15 +34,14 @@ class Signaling(ctx: Context) {
         FirebaseAuth.getInstance().signInAnonymously()
             .addOnSuccessListener {
                 status = "онлайн"
-                db.child("users").child(myCode).setValue(it.user?.uid)
+                db.child("users").child(myNumber).setValue(it.user?.uid)
                 listen()
             }
             .addOnFailureListener { status = "ошибка: ${it.message}" }
     }
 
-    // слушаем записки, адресованные нам
     private fun listen() {
-        db.child("calls").child(myCode).addValueEventListener(object : ValueEventListener {
+        db.child("calls").child(myNumber).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(s: DataSnapshot) {
                 incomingFrom = s.child("from").getValue(String::class.java)
             }
@@ -48,15 +51,19 @@ class Signaling(ctx: Context) {
         })
     }
 
-    // кладём записку "звонит такой-то" на код второго телефона
     fun call(to: String) {
         if (to.isEmpty()) return
         db.child("calls").child(to).setValue(
-            mapOf("from" to myCode, "ts" to ServerValue.TIMESTAMP)
+            mapOf("from" to myNumber, "ts" to ServerValue.TIMESTAMP)
         )
     }
 
+    // звонящий положил трубку: убираем записку у второго
+    fun cancel(to: String) {
+        if (to.isNotEmpty()) db.child("calls").child(to).removeValue()
+    }
+
     fun clearIncoming() {
-        db.child("calls").child(myCode).removeValue()
+        db.child("calls").child(myNumber).removeValue()
     }
 }

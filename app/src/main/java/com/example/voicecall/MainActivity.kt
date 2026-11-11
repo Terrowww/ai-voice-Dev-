@@ -7,14 +7,10 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,59 +57,62 @@ fun AppRoot() {
 
     var screen by remember { mutableStateOf<Screen>(Screen.Main) }
     val view = LocalView.current
-    val inCall = screen is Screen.Call
+    val incoming = sig.incomingFrom
+    val showIncoming = incoming != null && screen !is Screen.Call
+    val dark = screen is Screen.Call || showIncoming
 
     SideEffect {
         val window = (view.context as Activity).window
         val c = WindowCompat.getInsetsController(window, view)
-        c.isAppearanceLightStatusBars = !inCall
-        c.isAppearanceLightNavigationBars = !inCall
+        c.isAppearanceLightStatusBars = !dark
+        c.isAppearanceLightNavigationBars = !dark
     }
     DisposableEffect(Unit) { onDispose { vs.engine.stop() } }
-    BackHandler(enabled = screen !is Screen.Main) { screen = Screen.Main }
+    BackHandler(enabled = screen !is Screen.Main) {
+        (screen as? Screen.Call)?.let { c -> sig.cancel(c.number.filter { d -> d.isDigit() }) }
+        screen = Screen.Main
+    }
 
-    Box {
+    Box(Modifier.fillMaxSize()) {
         when (val s = screen) {
             is Screen.Main -> PhoneScreen(
                 onCall = { n, num ->
-                    sig.call(num.filter { it.isDigit() })
-                    screen = Screen.Call(n, num)
+                    val digits = num.filter { it.isDigit() }
+                    sig.call(digits)
+                    screen = Screen.Call(if (digits.length == 10) fmtNumber(digits) else n, num)
                 },
                 onVoice = { screen = Screen.Voice }
             )
             is Screen.Voice -> VoiceSettingsScreen(vs) { screen = Screen.Main }
-            is Screen.Call -> CallScreen(s.name, s.number, vs) { screen = Screen.Main }
+            is Screen.Call -> CallScreen(s.name, s.number, vs) {
+                sig.cancel(s.number.filter { it.isDigit() })
+                screen = Screen.Main
+            }
         }
 
-        // свой код и статус подключения (только на главном экране)
-        if (screen is Screen.Main) {
+        // свой номер виден только в настройках голоса
+        if (screen is Screen.Voice) {
             Text(
-                "Мой код: ${sig.myCode} · ${sig.status}",
+                "Мой номер: ${fmtNumber(sig.myNumber)} · ${sig.status}",
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 4.dp),
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp),
                 color = Color.Gray,
-                fontSize = 13.sp
+                fontSize = 14.sp
             )
         }
 
-        // входящая записка: пока просто плашка, настоящий звонок будет дальше
-        val from = sig.incomingFrom
-        if (from != null) {
-            Row(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 36.dp)
-                    .background(Color(0xFF2E7D32))
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Звонок от $from", color = Color.White, fontSize = 18.sp)
-                Spacer(Modifier.width(12.dp))
-                Button(onClick = { sig.clearIncoming() }) { Text("Сброс") }
-            }
+        // входящий вызов: полный экран как у системной звонилки
+        if (showIncoming && incoming != null) {
+            IncomingScreen(
+                number = fmtNumber(incoming),
+                onAccept = {
+                    sig.clearIncoming()
+                    screen = Screen.Call(fmtNumber(incoming), incoming)
+                },
+                onDecline = { sig.clearIncoming() }
+            )
         }
     }
 }

@@ -61,12 +61,12 @@ fun PhoneScreen(onCall: (String, String) -> Unit, onVoice: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(Color(0xFFF1F1F6))) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Spacer(Modifier.height(80.dp))
+            Spacer(Modifier.height(40.dp))
             Text(
                 "Телефон", Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                 fontSize = 34.sp, fontWeight = FontWeight.Medium, color = Color.Black
             )
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(20.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.End
@@ -114,19 +114,19 @@ fun LogTab(onCall: (String, String) -> Unit) {
                         g.items.forEachIndexed { i, e ->
                             Row(
                                 Modifier.fillMaxWidth().clickable { onCall(e.name, e.number) }
-                                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                                    .padding(horizontal = 20.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     if (e.outgoing) "↗" else "↙",
-                                    color = if (e.outgoing) Green else Gray, fontSize = 22.sp
+                                    color = if (e.outgoing) Green else Gray, fontSize = 18.sp
                                 )
                                 Spacer(Modifier.width(16.dp))
                                 Text(
                                     e.name + if (e.count > 1) " (${e.count})" else "",
-                                    Modifier.weight(1f), fontSize = 24.sp, color = Color.Black
+                                    Modifier.weight(1f), fontSize = 18.sp, color = Color.Black
                                 )
-                                Text(e.time, color = Gray, fontSize = 16.sp)
+                                Text(e.time, color = Gray, fontSize = 14.sp)
                             }
                             if (i < g.items.size - 1) {
                                 HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = Color(0x14000000))
@@ -148,11 +148,11 @@ fun ContactsTab(onCall: (String, String) -> Unit) {
                     demoContacts.forEachIndexed { i, c ->
                         Row(
                             Modifier.fillMaxWidth().clickable { onCall(c.first, c.second) }
-                                .padding(horizontal = 20.dp, vertical = 20.dp),
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(c.first, Modifier.weight(1f), fontSize = 24.sp, color = Color.Black)
-                            Text(c.second, color = Gray, fontSize = 15.sp)
+                            Text(c.first, Modifier.weight(1f), fontSize = 18.sp, color = Color.Black)
+                            Text(c.second, color = Gray, fontSize = 13.sp)
                         }
                         if (i < demoContacts.size - 1) {
                             HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = Color(0x14000000))
