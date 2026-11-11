@@ -1,12 +1,16 @@
 package com.example.voicecall
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -20,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
@@ -53,9 +58,22 @@ fun AppRoot() {
     val vs = remember { VoiceState() }
     val ctx = LocalContext.current
     val sig = remember { Signaling(ctx) }
-    LaunchedEffect(Unit) { sig.start() }
-
+    val engine = remember { CallEngine(ctx, sig) }
     var screen by remember { mutableStateOf<Screen>(Screen.Main) }
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    LaunchedEffect(Unit) {
+        sig.start()
+        engine.onEnded = { screen = Screen.Main }
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     val view = LocalView.current
     val incoming = sig.incomingFrom
     val showIncoming = incoming != null && screen !is Screen.Call
@@ -69,7 +87,7 @@ fun AppRoot() {
     }
     DisposableEffect(Unit) { onDispose { vs.engine.stop() } }
     BackHandler(enabled = screen !is Screen.Main) {
-        (screen as? Screen.Call)?.let { c -> sig.cancel(c.number.filter { d -> d.isDigit() }) }
+        if (screen is Screen.Call) engine.hangup()
         screen = Screen.Main
     }
 
@@ -78,16 +96,24 @@ fun AppRoot() {
             is Screen.Main -> PhoneScreen(
                 onCall = { n, num ->
                     val digits = num.filter { it.isDigit() }
-                    sig.call(digits)
+                    if (digits.length >= 7) engine.startCall(digits)
                     screen = Screen.Call(if (digits.length == 10) fmtNumber(digits) else n, num)
                 },
                 onVoice = { screen = Screen.Voice }
             )
             is Screen.Voice -> VoiceSettingsScreen(vs) { screen = Screen.Main }
-            is Screen.Call -> CallScreen(s.name, s.number, vs) {
-                sig.cancel(s.number.filter { it.isDigit() })
-                screen = Screen.Main
-            }
+            is Screen.Call -> CallScreen(
+                name = s.name,
+                number = s.number,
+                vs = vs,
+                live = engine.connected,
+                onMute = { engine.mute(it) },
+                onSpeaker = { engine.speaker(it) },
+                onEnd = {
+                    engine.hangup()
+                    screen = Screen.Main
+                }
+            )
         }
 
         // свой номер виден только в настройках голоса
@@ -105,10 +131,11 @@ fun AppRoot() {
 
         // входящий вызов: полный экран как у системной звонилки
         if (showIncoming && incoming != null) {
+            val offer = sig.incomingOffer
             IncomingScreen(
                 number = fmtNumber(incoming),
                 onAccept = {
-                    sig.clearIncoming()
+                    if (offer != null) engine.accept(offer)
                     screen = Screen.Call(fmtNumber(incoming), incoming)
                 },
                 onDecline = { sig.clearIncoming() }

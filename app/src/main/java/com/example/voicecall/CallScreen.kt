@@ -23,16 +23,25 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 @Composable
-fun CallScreen(name: String, number: String, vs: VoiceState, onEnd: () -> Unit) {
-    var connected by remember { mutableStateOf(false) }
+fun CallScreen(
+    name: String,
+    number: String,
+    vs: VoiceState,
+    live: Boolean,
+    onMute: (Boolean) -> Unit,
+    onSpeaker: (Boolean) -> Unit,
+    onEnd: () -> Unit
+) {
     var seconds by remember { mutableIntStateOf(0) }
     var muted by remember { mutableStateOf(false) }
     var speaker by remember { mutableStateOf(false) }
+    val connected = live
 
-    LaunchedEffect(Unit) {
-        delay(2000)
-        connected = true
-        while (true) { delay(1000); seconds++ }
+    LaunchedEffect(live) {
+        seconds = 0
+        if (live) {
+            while (true) { delay(1000); seconds++ }
+        }
     }
     val time = "%02d:%02d".format(seconds / 60, seconds % 60)
 
@@ -62,12 +71,16 @@ fun CallScreen(name: String, number: String, vs: VoiceState, onEnd: () -> Unit) 
                 CallButton("Выключить\nмикрофон", muted, onClick = {
                     muted = !muted
                     vs.engine.muted = muted
+                    onMute(muted)
                 }) { IconMic(if (muted) Color.Black else Color.White) }
                 CallButton("Bluetooth", false, onClick = {}) { IconBluetooth(Color.White) }
             }
             Spacer(Modifier.height(20.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                CallButton("Динамик", speaker, onClick = { speaker = !speaker }) {
+                CallButton("Динамик", speaker, onClick = {
+                    speaker = !speaker
+                    onSpeaker(speaker)
+                }) {
                     IconSpeaker(if (speaker) Color.Black else Color.White)
                 }
                 CallButton("Клавиатура", false, onClick = {}) { IconKeypad(Color.White) }
